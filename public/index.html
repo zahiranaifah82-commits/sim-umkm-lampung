@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>SIM UMKM Multitenant - Kota Bandar Lampung (Food Delivery)</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#ee4d2d">
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Phosphor Icons CDN -->
+  <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+  <!-- Custom Mobile Styles -->
+  <link rel="stylesheet" href="/css/app.css">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              DEFAULT: '#ee4d2d',
+              dark: '#d73211',
+              light: '#fff5f3'
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-gray-100 flex justify-center">
+
+  <!-- Main Mobile App Frame -->
+  <div class="app-container" id="app">
+    
+    <!-- TOP BAR / ROLE SIMULATOR SWITCHER -->
+    <header class="sticky top-0 bg-white border-b border-gray-100 z-30 shadow-xs">
+      <!-- Role Switcher Ribbon -->
+      <div class="bg-gray-900 text-white px-3 py-1.5 text-xs flex justify-between items-center">
+        <span class="flex items-center gap-1 font-medium text-amber-400">
+          <i class="ph-fill ph-crown"></i> Mode Aktif:
+        </span>
+        <select id="role-selector" class="bg-gray-800 text-white rounded px-2 py-0.5 text-xs border border-gray-700 outline-none" onchange="switchRole(this.value)">
+          <option value="customer">🛍️ Customer (Budi Santoso)</option>
+          <option value="tenant_admin">🏪 UMKM Admin (Pempek 123)</option>
+          <option value="courier">🛵 Kurir (Wayan - BDL)</option>
+          <option value="super_admin">👑 Super Admin BDL</option>
+        </select>
+      </div>
+
+      <!-- Location Header (Khusus Customer) -->
+      <div id="customer-header" class="p-3 bg-white">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2 cursor-pointer" onclick="openLocationModal()">
+            <div class="w-8 h-8 rounded-full bg-brand-light flex items-center justify-center text-brand">
+              <i class="ph-bold ph-map-pin text-lg"></i>
+            </div>
+            <div>
+              <div class="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Antar Ke (Bandar Lampung)</div>
+              <div class="text-xs font-bold text-gray-800 flex items-center gap-1">
+                <span id="current-location-text">Kedaton, Bandar Lampung</span>
+                <i class="ph ph-caret-down text-gray-400"></i>
+              </div>
+            </div>
+          </div>
+          <button onclick="detectCurrentGps()" class="text-xs text-brand font-medium flex items-center gap-1 bg-brand-light px-2.5 py-1.5 rounded-full hover:bg-orange-100 transition">
+            <i class="ph-bold ph-crosshair"></i> GPS Saya
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- MAIN VIEWS CONTAINER -->
+    <main class="flex-1 pb-24 overflow-y-auto">
+
+      <!-- ======================================================= -->
+      <!-- VIEW 1: CUSTOMER VIEW (PENCARIAN, KATALOG, UMKM TERDEKAT) -->
+      <!-- ======================================================= -->
+      <section id="view-customer" class="space-y-4 p-3">
+        <!-- Search Input -->
+        <div class="relative">
+          <i class="ph ph-magnifying-glass absolute left-3 top-3 text-gray-400 text-lg"></i>
+          <input 
+            type="text" 
+            id="search-input"
+            oninput="handleSearch(this.value)"
+            placeholder="Cari pempek, seruit, kopi robusta, atau resto..."
+            class="w-full pl-10 pr-4 py-2.5 bg-gray-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-brand border border-transparent transition"
+          >
+        </div>
+
+        <!-- Banner Promo Kuliner BDL -->
+        <div class="bg-gradient-to-r from-orange-500 to-amber-500 rounded-2xl p-4 text-white shadow-sm relative overflow-hidden">
+          <div class="relative z-10">
+            <span class="bg-white/20 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">ShopeeFood BDL</span>
+            <h2 class="text-base font-extrabold mt-1">Kuliner Khas Bandar Lampung</h2>
+            <p class="text-xs text-orange-100 mt-0.5">Ongkir terjangkau mulai Rp 8.000 dengan radius GPS akurat.</p>
+          </div>
+          <i class="ph-duotone ph-bowl-food absolute -right-3 -bottom-3 text-7xl text-white/20"></i>
+        </div>
+
+        <!-- Category Horizontal Pills -->
+        <div>
+          <div class="text-xs font-bold text-gray-700 mb-2">Kategori Kuliner Populer</div>
+          <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+            <button onclick="filterCategory('')" class="category-pill active px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap bg-brand text-white shadow-xs">
+              Semua
+            </button>
+            <button onclick="filterCategory('pempek')" class="category-pill px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap bg-white border border-gray-200 text-gray-700">
+              🐟 Pempek & Khas
+            </button>
+            <button onclick="filterCategory('kopi')" class="category-pill px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap bg-white border border-gray-200 text-gray-700">
+              ☕ Kopi Robusta
+            </button>
+            <button onclick="filterCategory('seruit')" class="category-pill px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap bg-white border border-gray-200 text-gray-700">
+              🌶️ Sambal Seruit
+            </button>
+            <button onclick="filterCategory('bebek')" class="category-pill px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap bg-white border border-gray-200 text-gray-700">
+              🍗 Ayam & Bebek
+            </button>
+          </div>
+        </div>
+
+        <!-- Nearby UMKM Section -->
+        <div>
+          <div class="flex justify-between items-center mb-2.5">
+            <h3 class="text-sm font-bold text-gray-900 flex items-center gap-1.5">
+              <span>UMKM Terdekat di Bandar Lampung</span>
+              <span class="text-[10px] bg-red-100 text-brand px-1.5 py-0.5 rounded font-semibold">Radius GPS</span>
+            </h3>
+            <span id="merchant-count" class="text-xs text-gray-500">Memuat...</span>
+          </div>
+
+          <!-- Merchant List Container -->
+          <div id="merchants-list" class="space-y-3">
+            <!-- Dynamic Merchant Cards -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================= -->
+      <!-- VIEW 2: TENANT ADMIN VIEW (DAPUR, STOK, BUKU KAS)       -->
+      <!-- ======================================================= -->
+      <section id="view-tenant" class="hidden space-y-4 p-3">
+        <!-- Tenant Header Card -->
+        <div class="bg-white border border-gray-200 rounded-2xl p-4 shadow-xs">
+          <div class="flex justify-between items-start">
+            <div>
+              <div class="text-[10px] text-gray-500 uppercase font-bold tracking-wider">Dashboard UMKM Terdaftar</div>
+              <h2 id="merchant-dashboard-name" class="text-base font-extrabold text-gray-900">Pempek 123 Asli Lampung</h2>
+              <div class="text-xs text-gray-500 mt-0.5">Outlet Cabang Teluk Betung Selatan</div>
+            </div>
+            <span id="merchant-subscription-badge" class="px-2 py-1 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-800">
+              Active
+            </span>
+          </div>
+
+          <!-- Quick Stats Grid -->
+          <div class="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-gray-100 text-center">
+            <div class="bg-orange-50 p-2 rounded-xl">
+              <div class="text-[10px] text-gray-500 font-medium">Pendapatan Hari Ini</div>
+              <div id="stat-revenue" class="text-xs font-bold text-brand mt-0.5">Rp 0</div>
+            </div>
+            <div class="bg-blue-50 p-2 rounded-xl">
+              <div class="text-[10px] text-gray-500 font-medium">Pesanan Masuk</div>
+              <div id="stat-active-orders" class="text-xs font-bold text-blue-700 mt-0.5">0</div>
+            </div>
+            <div class="bg-emerald-50 p-2 rounded-xl">
+              <div class="text-[10px] text-gray-500 font-medium">Kas Bersih</div>
+              <div id="stat-balance" class="text-xs font-bold text-emerald-700 mt-0.5">Rp 0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tenant Tabs -->
+        <div class="flex border-b border-gray-200">
+          <button onclick="switchTenantTab('orders')" id="tab-btn-orders" class="flex-1 py-2 text-xs font-bold text-brand border-b-2 border-brand">
+            Pesanan Masuk (<span id="tenant-order-badge">0</span>)
+          </button>
+          <button onclick="switchTenantTab('inventory')" id="tab-btn-inventory" class="flex-1 py-2 text-xs font-bold text-gray-500 border-b-2 border-transparent">
+            Kelola Stok Produk
+          </button>
+          <button onclick="switchTenantTab('ledger')" id="tab-btn-ledger" class="flex-1 py-2 text-xs font-bold text-gray-500 border-b-2 border-transparent">
+            Buku Kas (Ledger)
+          </button>
+        </div>
+
+        <!-- Tab 1: Pesanan Masuk (Realtime Kitchen) -->
+        <div id="tenant-tab-orders" class="space-y-3">
+          <div id="tenant-orders-list" class="space-y-3">
+            <!-- Dynamic Kitchen Order Cards -->
+          </div>
+        </div>
+
+        <!-- Tab 2: Kelola Stok Inventori -->
+        <div id="tenant-tab-inventory" class="hidden space-y-3">
+          <div class="flex justify-between items-center">
+            <h4 class="text-xs font-bold text-gray-800">Ketersediaan & Stok Menu</h4>
+            <span class="text-[11px] text-gray-500">Auto-deduct saat order</span>
+          </div>
+          <div id="inventory-list" class="space-y-2">
+            <!-- Dynamic Inventory Items -->
+          </div>
+        </div>
+
+        <!-- Tab 3: Buku Kas UMKM (Income & Expense) -->
+        <div id="tenant-tab-ledger" class="hidden space-y-3">
+          <div class="flex justify-between items-center">
+            <div>
+              <h4 class="text-xs font-bold text-gray-800">Catatan Arus Kas UMKM</h4>
+              <p class="text-[10px] text-gray-500">Otomatis mencatat omzet & pengeluaran</p>
+            </div>
+            <button onclick="openAddExpenseModal()" class="text-xs bg-gray-900 text-white px-2.5 py-1.5 rounded-lg flex items-center gap-1">
+              <i class="ph-bold ph-plus"></i> Catat Biaya
+            </button>
+          </div>
+          <div id="ledger-list" class="space-y-2">
+            <!-- Dynamic Ledger Entries -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================= -->
+      <!-- VIEW 3: COURIER VIEW (PESANAN SIAP ANTAR DI BDL)        -->
+      <!-- ======================================================= -->
+      <section id="view-courier" class="hidden space-y-4 p-3">
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-2xl p-4 shadow-xs">
+          <div class="flex justify-between items-center">
+            <div>
+              <div class="text-[10px] text-blue-200 uppercase font-semibold">Kurir Delivery Bandar Lampung</div>
+              <h2 class="text-base font-bold">Wayan Kurniawan</h2>
+              <div class="text-xs text-blue-100 mt-0.5">Wilayah: Way Halim & Kedaton</div>
+            </div>
+            <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-xl">
+              <i class="ph-bold ph-moped"></i>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="text-xs font-bold text-gray-800 mb-2 flex items-center justify-between">
+            <span>Pesanan Siap Diantar (Ready for Pickup)</span>
+            <button onclick="loadCourierOrders()" class="text-brand text-xs flex items-center gap-1 font-semibold">
+              <i class="ph ph-arrows-clockwise"></i> Refresh
+            </button>
+          </h3>
+          <div id="courier-available-list" class="space-y-3">
+            <!-- Dynamic Ready Orders for Courier -->
+          </div>
+        </div>
+
+        <div>
+          <h3 class="text-xs font-bold text-gray-800 mb-2">Pengantaran Sedang Berjalan</h3>
+          <div id="courier-active-list" class="space-y-3">
+            <!-- Dynamic Active Deliveries -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================= -->
+      <!-- VIEW 4: SUPER ADMIN VIEW (MULTITENANT MANAGEMENT)       -->
+      <!-- ======================================================= -->
+      <section id="view-admin" class="hidden space-y-4 p-3">
+        <div class="bg-gray-900 text-white rounded-2xl p-4">
+          <h2 class="text-sm font-bold flex items-center gap-1.5">
+            <i class="ph-fill ph-shield-check text-amber-400"></i>
+            Super Admin: Ekosistem UMKM Bandar Lampung
+          </h2>
+          <p class="text-xs text-gray-400 mt-1">Kelola lisensi langganan UMKM dan referensi wilayah kecamatan.</p>
+        </div>
+
+        <div>
+          <h3 class="text-xs font-bold text-gray-800 mb-2">Daftar Tenant UMKM Terdaftar</h3>
+          <div id="admin-tenants-list" class="space-y-3">
+            <!-- Dynamic Admin Tenant Cards -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================= -->
+      <!-- VIEW 5: RIWAYAT PESANAN SAYA (CUSTOMER ORDERS HISTORY) -->
+      <!-- ======================================================= -->
+      <section id="view-history" class="hidden space-y-4 p-3">
+        <h3 class="text-sm font-bold text-gray-900">Riwayat Pesanan Anda</h3>
+        <div id="customer-orders-history" class="space-y-3">
+          <!-- Dynamic Order History Cards -->
+        </div>
+      </section>
+
+    </main>
+
+    <!-- FLOATING CART BAR (Muncul jika ada item di keranjang) -->
+    <div id="floating-cart-bar" class="floating-cart-bar hidden">
+      <div class="bg-brand text-white rounded-2xl p-3.5 shadow-lg flex items-center justify-between cursor-pointer" onclick="openCheckoutModal()">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center font-bold text-sm">
+            <span id="cart-item-count">0</span>
+          </div>
+          <div>
+            <div class="text-[11px] text-orange-100">Total Keranjang</div>
+            <div id="cart-total-price" class="text-sm font-extrabold">Rp 0</div>
+          </div>
+        </div>
+        <button class="bg-white text-brand px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1 shadow-xs">
+          <span>Checkout</span>
+          <i class="ph-bold ph-arrow-right"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- BOTTOM NAVIGATION BAR (Ala Mobile App ShopeeFood) -->
+    <nav class="bottom-nav">
+      <div class="grid grid-cols-4 text-center py-2">
+        <button onclick="navGo('customer')" id="nav-btn-home" class="flex flex-col items-center justify-center text-brand">
+          <i class="ph-fill ph-house text-xl"></i>
+          <span class="text-[10px] font-bold mt-0.5">Beranda</span>
+        </button>
+        <button onclick="navGo('history')" id="nav-btn-history" class="flex flex-col items-center justify-center text-gray-400">
+          <i class="ph-bold ph-receipt text-xl"></i>
+          <span class="text-[10px] font-medium mt-0.5">Pesanan</span>
+        </button>
+        <button onclick="navGo('tenant')" id="nav-btn-tenant" class="flex flex-col items-center justify-center text-gray-400">
+          <i class="ph-bold ph-storefront text-xl"></i>
+          <span class="text-[10px] font-medium mt-0.5">Dapur Resto</span>
+        </button>
+        <button onclick="navGo('courier')" id="nav-btn-courier" class="flex flex-col items-center justify-center text-gray-400">
+          <i class="ph-bold ph-moped text-xl"></i>
+          <span class="text-[10px] font-medium mt-0.5">Kurir Antar</span>
+        </button>
+      </div>
+    </nav>
+
+    <!-- ======================================================= -->
+    <!-- MODAL 1: DETAIL MENU & PRODUCT ADDONS SELECTION        -->
+    <!-- ======================================================= -->
+    <div id="addon-modal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-end justify-center">
+      <div class="bg-white w-full max-w-[480px] rounded-t-3xl max-h-[85vh] flex flex-col overflow-hidden animate-slide-up">
+        <!-- Modal Header -->
+        <div class="p-4 border-b border-gray-100 flex justify-between items-center">
+          <h3 class="text-sm font-bold text-gray-900" id="addon-modal-title">Kustomisasi Menu</h3>
+          <button onclick="closeAddonModal()" class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600">
+            <i class="ph-bold ph-x"></i>
+          </button>
+        </div>
+
+        <!-- Modal Body Scrollable -->
+        <div class="p-4 overflow-y-auto space-y-4 flex-1">
+          <div class="flex gap-3 items-center">
+            <img id="addon-modal-img" src="" alt="Menu" class="w-20 h-20 rounded-2xl object-cover bg-gray-100">
+            <div>
+              <h4 id="addon-modal-name" class="font-extrabold text-sm text-gray-900"></h4>
+              <p id="addon-modal-desc" class="text-xs text-gray-500 mt-0.5 line-clamp-2"></p>
+              <div id="addon-modal-base-price" class="text-brand font-bold text-sm mt-1"></div>
+            </div>
+          </div>
+
+          <!-- Addons List -->
+          <div>
+            <div class="text-xs font-bold text-gray-800 mb-1 flex items-center justify-between">
+              <span>Pilihan Tambahan / Add-ons</span>
+              <span class="text-[10px] text-gray-400 font-normal">Opsional</span>
+            </div>
+            <div id="addon-modal-options" class="space-y-2">
+              <!-- Checkboxes Addons -->
+            </div>
+          </div>
+
+          <!-- Special Item Notes -->
+          <div>
+            <label class="block text-xs font-bold text-gray-800 mb-1">Catatan Khusus untuk Dapur</label>
+            <input 
+              type="text" 
+              id="addon-modal-notes" 
+              placeholder="Contoh: Pisahkan sambal, jangan pakai timun"
+              class="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-brand"
+            >
+          </div>
+
+          <!-- Qty Stepper -->
+          <div class="flex justify-between items-center pt-2 border-t border-gray-100">
+            <span class="text-xs font-bold text-gray-800">Jumlah Pesanan</span>
+            <div class="flex items-center gap-3 bg-gray-100 rounded-full px-3 py-1">
+              <button onclick="changeAddonQty(-1)" class="w-6 h-6 rounded-full bg-white flex items-center justify-center text-brand font-bold shadow-xs">
+                -
+              </button>
+              <span id="addon-modal-qty" class="text-sm font-bold text-gray-800 w-4 text-center">1</span>
+              <button onclick="changeAddonQty(1)" class="w-6 h-6 rounded-full bg-white flex items-center justify-center text-brand font-bold shadow-xs">
+                +
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modal Footer CTA -->
+        <div class="p-4 border-t border-gray-100 bg-gray-50">
+          <button onclick="confirmAddToCart()" class="w-full bg-brand hover:bg-brand-dark text-white font-bold py-3 rounded-2xl text-xs flex justify-between px-5 items-center shadow-md">
+            <span>Tambah ke Keranjang</span>
+            <span id="addon-modal-total-btn">Rp 0</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================= -->
+    <!-- MODAL 2: CHECKOUT & ONGKIR HAVERSINE                   -->
+    <!-- ======================================================= -->
+    <div id="checkout-modal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-end justify-center">
+      <div class="bg-white w-full max-w-[480px] rounded-t-3xl max-h-[90vh] flex flex-col overflow-hidden animate-slide-up">
+        <div class="p-4 border-b border-gray-100 flex justify-between items-center">
+          <h3 class="text-sm font-bold text-gray-900">Konfirmasi Pemesanan & Alamat</h3>
+          <button onclick="closeCheckoutModal()" class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-600">
+            <i class="ph-bold ph-x"></i>
+          </button>
+        </div>
+
+        <div class="p-4 overflow-y-auto space-y-4 flex-1">
+          <!-- Alamat Pengantaran -->
+          <div class="bg-orange-50/60 border border-orange-100 rounded-2xl p-3">
+            <div class="text-[10px] text-brand uppercase font-bold flex items-center gap-1">
+              <i class="ph-bold ph-navigation-arrow"></i> Alamat Pengantaran Bandar Lampung
+            </div>
+            <textarea 
+              id="checkout-address" 
+              rows="2"
+              class="w-full mt-1.5 p-2 bg-white border border-orange-200 rounded-xl text-xs outline-none focus:ring-1 focus:ring-brand font-medium"
+              placeholder="Tuliskan nama jalan, no rumah, dan patokan (misal: Jl. Teuku Umar No. 12, Kedaton)"
+            >Jl. Teuku Umar No. 15, Kedaton, Kota Bandar Lampung (Dekat Mall Boemi Kedaton)</textarea>
+            
+            <div class="flex justify-between items-center mt-2 text-[11px] text-gray-600">
+              <span class="flex items-center gap-1 font-semibold text-emerald-700">
+                <i class="ph-bold ph-check-circle"></i> Koordinat GPS Terkunci
+              </span>
+              <span id="checkout-distance-badge" class="bg-white px-2 py-0.5 rounded-full font-bold text-gray-700 border border-gray-200">
+                1.4 km
+              </span>
+            </div>
+          </div>
+
+          <!-- Rincian Item di Keranjang -->
+          <div>
+            <div class="text-xs font-bold text-gray-800 mb-2">Ringkasan Menu</div>
+            <div id="checkout-items-list" class="space-y-2 border-b border-gray-100 pb-3">
+              <!-- Dynamic Items -->
+            </div>
+          </div>
+
+          <!-- Pilihan Metode Pembayaran -->
+          <div>
+            <div class="text-xs font-bold text-gray-800 mb-2">Metode Pembayaran</div>
+            <div class="grid grid-cols-3 gap-2">
+              <label class="border border-brand bg-brand-light rounded-xl p-2.5 text-center cursor-pointer flex flex-col items-center">
+                <input type="radio" name="payment_method" value="qris" checked class="hidden">
+                <i class="ph-bold ph-qr-code text-xl text-brand"></i>
+                <span class="text-[10px] font-bold text-brand mt-1">QRIS Instan</span>
+              </label>
+              <label class="border border-gray-200 rounded-xl p-2.5 text-center cursor-pointer flex flex-col items-center hover:bg-gray-50">
+                <input type="radio" name="payment_method" value="cash" class="hidden">
+                <i class="ph-bold ph-money text-xl text-gray-600"></i>
+                <span class="text-[10px] font-bold text-gray-700 mt-1">Tunai / COD</span>
+              </label>
+              <label class="border border-gray-200 rounded-xl p-2.5 text-center cursor-pointer flex flex-col items-center hover:bg-gray-50">
+                <input type="radio" name="payment_method" value="midtrans" class="hidden">
+                <i class="ph-bold ph-credit-card text-xl text-gray-600"></i>
+                <span class="text-[10px] font-bold text-gray-700 mt-1">Gateway</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Rincian Ongkir & Biaya -->
+          <div class="bg-gray-50 rounded-2xl p-3 text-xs space-y-1.5">
+            <div class="flex justify-between text-gray-600">
+              <span>Subtotal Makanan</span>
+              <span id="checkout-subtotal" class="font-bold text-gray-800">Rp 0</span>
+            </div>
+            <div class="flex justify-between text-gray-600">
+              <span class="flex items-center gap-1">
+                Ongkos Kirim BDL (<span id="checkout-calc-km">0 km</span>)
+              </span>
+              <span id="checkout-delivery-fee" class="font-bold text-gray-800">Rp 8.000</span>
+            </div>
+            <div class="flex justify-between text-gray-600">
+              <span>Biaya Layanan Aplikasi</span>
+              <span class="font-bold text-gray-800">Rp 2.000</span>
+            </div>
+            <div class="flex justify-between text-sm font-extrabold text-brand pt-2 border-t border-gray-200">
+              <span>Total Pembayaran</span>
+              <span id="checkout-grand-total">Rp 0</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-4 border-t border-gray-100 bg-white">
+          <button onclick="submitOrderCheckout()" id="btn-submit-order" class="w-full bg-brand hover:bg-brand-dark text-white font-bold py-3.5 rounded-2xl text-xs shadow-md transition flex items-center justify-center gap-2">
+            <span>Pesan Sekarang (Buat Pesanan)</span>
+            <i class="ph-bold ph-arrow-right"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================= -->
+    <!-- MODAL 3: QRIS & SIMULASI PEMBAYARAN                    -->
+    <!-- ======================================================= -->
+    <div id="qris-modal" class="fixed inset-0 bg-black/70 z-50 hidden flex items-center justify-center p-4">
+      <div class="bg-white w-full max-w-sm rounded-3xl p-5 text-center space-y-3 animate-scale-up">
+        <div class="w-12 h-12 rounded-full bg-orange-100 text-brand flex items-center justify-center mx-auto text-2xl">
+          <i class="ph-bold ph-qr-code"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-extrabold text-gray-900">Pembayaran QRIS Nasional</h3>
+          <p class="text-xs text-gray-500 mt-0.5">Scan kode di bawah menggunakan GoPay, OVO, Dana, BCA, atau Livin'</p>
+        </div>
+
+        <!-- Dynamic QR Image -->
+        <div class="bg-gray-50 p-3 rounded-2xl border border-gray-200 inline-block">
+          <img id="qris-image" src="" alt="QRIS Code" class="w-48 h-48 mx-auto object-contain">
+          <div id="qris-order-number" class="text-[10px] font-mono text-gray-500 mt-2">BDL-20261102-XXXX</div>
+          <div id="qris-amount" class="text-sm font-extrabold text-brand mt-0.5">Rp 0</div>
+        </div>
+
+        <div class="pt-2 space-y-2">
+          <button onclick="simulatePaySuccess()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-xs transition shadow-sm">
+            ⚡ Simulasikan Pembayaran Berhasil (Webhook)
+          </button>
+          <button onclick="closeQrisModal()" class="w-full text-xs text-gray-500 py-1">
+            Bayar Nanti / Tutup
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================= -->
+    <!-- MODAL 4: LIVE ORDER STATUS TRACKING (SHOPEEFOOD)        -->
+    <!-- ======================================================= -->
+    <div id="tracking-modal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-end justify-center">
+      <div class="bg-white w-full max-w-[480px] rounded-t-3xl max-h-[90vh] flex flex-col overflow-hidden animate-slide-up">
+        <div class="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+          <div>
+            <div class="text-[10px] text-gray-400 font-bold uppercase">Pelacakan Real-Time</div>
+            <h3 class="text-xs font-bold text-gray-900" id="tracking-order-num">Pesanan #...</h3>
+          </div>
+          <button onclick="closeTrackingModal()" class="w-8 h-8 rounded-full bg-white flex items-center justify-center text-gray-600 shadow-xs">
+            <i class="ph-bold ph-x"></i>
+          </button>
+        </div>
+
+        <div class="p-4 overflow-y-auto space-y-4 flex-1">
+          <!-- Status Banner -->
+          <div id="tracking-status-banner" class="bg-brand-light border border-orange-100 rounded-2xl p-4 flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-brand text-white flex items-center justify-center text-xl shrink-0">
+              <i id="tracking-banner-icon" class="ph-bold ph-cooking-pot"></i>
+            </div>
+            <div>
+              <div id="tracking-banner-title" class="text-xs font-bold text-brand">Makanan Sedang Dimasak</div>
+              <div id="tracking-banner-desc" class="text-[11px] text-gray-600 mt-0.5">Resto sedang menyiapkan pesanan Anda dengan higienis.</div>
+            </div>
+          </div>
+
+          <!-- Stepper Timeline -->
+          <div>
+            <div class="text-xs font-bold text-gray-800 mb-3">Tahapan Pesanan</div>
+            <div id="tracking-stepper-list" class="space-y-4 pl-2">
+              <!-- Dynamic Steps -->
+            </div>
+          </div>
+
+          <!-- Courier Card (Jika ada) -->
+          <div id="tracking-courier-card" class="bg-gray-50 rounded-2xl p-3 border border-gray-100 flex justify-between items-center">
+            <div class="flex items-center gap-2.5">
+              <div class="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-lg">
+                <i class="ph-bold ph-moped"></i>
+              </div>
+              <div>
+                <div class="text-xs font-bold text-gray-900" id="tracking-courier-name">Kurir Siaga</div>
+                <div class="text-[10px] text-gray-500" id="tracking-courier-phone">0896-xxxx-xxxx</div>
+              </div>
+            </div>
+            <a id="tracking-courier-call" href="#" class="px-3 py-1.5 bg-white border border-gray-200 text-gray-700 rounded-xl text-xs font-medium flex items-center gap-1 shadow-xs">
+              <i class="ph-bold ph-phone text-emerald-600"></i> Hubungi
+            </a>
+          </div>
+
+          <!-- Detail Item -->
+          <div class="border-t border-gray-100 pt-3">
+            <div class="text-xs font-bold text-gray-800 mb-2">Rincian Menu yang Dipesan</div>
+            <div id="tracking-items-list" class="space-y-1.5 text-xs text-gray-600">
+              <!-- Dynamic Items -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================= -->
+    <!-- MODAL 5: GANTI TITIK LOKASI DI KOTA BANDAR LAMPUNG      -->
+    <!-- ======================================================= -->
+    <div id="location-modal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-4">
+      <div class="bg-white w-full max-w-sm rounded-3xl p-5 space-y-3">
+        <div class="flex justify-between items-center">
+          <h3 class="text-sm font-bold text-gray-900">Pilih Wilayah Bandar Lampung</h3>
+          <button onclick="closeLocationModal()" class="text-gray-400 hover:text-gray-600">
+            <i class="ph-bold ph-x text-lg"></i>
+          </button>
+        </div>
+        <p class="text-xs text-gray-500">Pilih titik acuan untuk simulasi perhitungan radius jarak GPS dan ongkir:</p>
+        
+        <div class="space-y-2 max-h-60 overflow-y-auto">
+          <button onclick="setLocationPreset(-5.3789000, 105.2571000, 'Kedaton (Dekat Pasar Koga)')" class="w-full text-left p-2.5 rounded-xl border border-gray-100 hover:bg-orange-50 hover:border-brand text-xs font-medium flex items-center justify-between">
+            <span>Kedaton (Pasar Koga)</span>
+            <span class="text-[10px] text-gray-400 font-mono">-5.378, 105.257</span>
+          </button>
+          <button onclick="setLocationPreset(-5.3852000, 105.2754000, 'Way Halim (Perumnas Way Halim)')" class="w-full text-left p-2.5 rounded-xl border border-gray-100 hover:bg-orange-50 hover:border-brand text-xs font-medium flex items-center justify-between">
+            <span>Way Halim (Jl. Kimaja)</span>
+            <span class="text-[10px] text-gray-400 font-mono">-5.385, 105.275</span>
+          </button>
+          <button onclick="setLocationPreset(-5.4485000, 105.2638000, 'Teluk Betung (Gedong Pakuon)')" class="w-full text-left p-2.5 rounded-xl border border-gray-100 hover:bg-orange-50 hover:border-brand text-xs font-medium flex items-center justify-between">
+            <span>Teluk Betung (Jl. Ikan Hiu)</span>
+            <span class="text-[10px] text-gray-400 font-mono">-5.448, 105.263</span>
+          </button>
+          <button onclick="setLocationPreset(-5.4124000, 105.2583000, 'Tanjung Karang (Raden Intan)')" class="w-full text-left p-2.5 rounded-xl border border-gray-100 hover:bg-orange-50 hover:border-brand text-xs font-medium flex items-center justify-between">
+            <span>Tanjung Karang (Raden Intan)</span>
+            <span class="text-[10px] text-gray-400 font-mono">-5.412, 105.258</span>
+          </button>
+          <button onclick="setLocationPreset(-5.3971400, 105.2667920, 'Tugu Adipura Enggal (Pusat Kota)')" class="w-full text-left p-2.5 rounded-xl border border-gray-100 hover:bg-orange-50 hover:border-brand text-xs font-medium flex items-center justify-between">
+            <span>Tugu Adipura (Enggal)</span>
+            <span class="text-[10px] text-gray-400 font-mono">-5.397, 105.266</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================= -->
+    <!-- MODAL 6: CATAT PENGELUARAN BUKU KAS UMKM               -->
+    <!-- ======================================================= -->
+    <div id="expense-modal" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-4">
+      <div class="bg-white w-full max-w-sm rounded-3xl p-5 space-y-3">
+        <div class="flex justify-between items-center">
+          <h3 class="text-sm font-bold text-gray-900">Catat Pengeluaran Operasional</h3>
+          <button onclick="closeAddExpenseModal()" class="text-gray-400 hover:text-gray-600">
+            <i class="ph-bold ph-x text-lg"></i>
+          </button>
+        </div>
+        <form onsubmit="submitExpenseForm(event)" class="space-y-3">
+          <div>
+            <label class="block text-xs font-semibold text-gray-700 mb-1">Nominal (Rp)</label>
+            <input type="number" id="expense-amount" required placeholder="Contoh: 150000" class="w-full p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs outline-none focus:border-brand font-medium">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-700 mb-1">Keterangan Biaya</label>
+            <input type="text" id="expense-desc" required placeholder="Contoh: Belanja Ikan Tenggiri di Pasar Koga" class="w-full p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs outline-none focus:border-brand font-medium">
+          </div>
+          <button type="submit" class="w-full bg-gray-900 text-white font-bold py-2.5 rounded-xl text-xs shadow-sm hover:bg-black transition">
+            Simpan ke Buku Kas
+          </button>
+        </form>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Client Application Logic -->
+  <script src="/js/app.js"></script>
+</body>
+</html>
