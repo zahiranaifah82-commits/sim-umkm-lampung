@@ -1,12 +1,7 @@
 import express from 'express';
 import cors from 'cors';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import apiRoutes from '../src/routes/api.js';
 import { runMigrations } from '../src/database/migrate.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 
@@ -14,39 +9,37 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve Frontend Web Statics
-const publicDir = path.resolve(__dirname, '../public');
-app.use(express.static(publicDir));
-
-let isMigrated = false;
-app.use(async (req, res, next) => {
-  if (!isMigrated && process.env.DATABASE_URL) {
-    try {
-      await runMigrations();
-      isMigrated = true;
-    } catch (e) {
-      console.error('Migration note:', e.message);
-      isMigrated = true; // Jangan looping jika tabel sudah ada
-    }
-  }
-  next();
-});
-
-// Health check
-app.get('/api/health', (req, res) => {
+// Health check endpoint
+const handleHealthCheck = (req, res) => {
   res.json({
     status: 'healthy',
-    app: 'SIM UMKM Multitenant Kota Bandar Lampung (Vercel Production)',
+    app: 'SIM UMKM Multitenant Kota Bandar Lampung (Vercel Serverless)',
+    database: process.env.DATABASE_URL ? 'PostgreSQL Supabase Connected' : 'SQLite Local',
     timestamp: new Date().toISOString()
   });
+};
+
+app.get('/api/health', handleHealthCheck);
+app.get('/health', handleHealthCheck);
+
+// Endpoint trigger migrasi database (opsional)
+app.get('/api/migrate', async (req, res) => {
+  try {
+    await runMigrations();
+    res.json({ success: true, message: 'Migrasi & seeder berhasil dijalankan.' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
 });
 
-// Mount API Router
+// Mount API router
 app.use('/api', apiRoutes);
+app.use('/', apiRoutes);
 
-// Fallback untuk SPA
-app.get('*', (req, res) => {
-  res.sendFile(path.resolve(publicDir, 'index.html'));
+// Error handler
+app.use((err, req, res, next) => {
+  console.error('API Error:', err);
+  res.status(500).json({ success: false, message: err.message || 'Internal Server Error' });
 });
 
 export default app;

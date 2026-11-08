@@ -2,8 +2,36 @@
   "version": 2,
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/api/(.*)",
       "destination": "/api/index.js"
+    },
+    {
+      "source": "/",
+      "destination": "/public/index.html"
+    },
+    {
+      "source": "/index.html",
+      "destination": "/public/index.html"
+    },
+    {
+      "source": "/css/(.*)",
+      "destination": "/public/css/$1"
+    },
+    {
+      "source": "/js/(.*)",
+      "destination": "/public/js/$1"
+    },
+    {
+      "source": "/manifest.json",
+      "destination": "/public/manifest.json"
+    },
+    {
+      "source": "/sw.js",
+      "destination": "/public/sw.js"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/public/index.html"
     }
   ]
 }
